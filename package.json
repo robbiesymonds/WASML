@@ -1,0 +1,34 @@
+{
+  "name": "wasml",
+  "version": "1.0.0",
+  "description": "WASM-powered reinforcement learning library written in Rust.",
+  "repository": "https://github.com/robbiesymonds/WASML",
+  "author": "Robbie Symonds <hello@robbiesymonds.me>",
+  "types": "dist/index.d.ts",
+  "main": "dist/index.js",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist/ && wasm-pack build --out-dir dist --target web && tsc && yarn clean",
+    "clean": "rm dist/.gitignore && rm dist/package.json",
+    "dev": "vite ./src/tests --port 3000",
+    "test": "npm pack --dry-run",
+    "publish": "npm publish"
+  },
+  "dependencies": {
+    "mathjs": "^11.3.2"
+  },
+  "devDependencies": {
+    "typescript": "^4.8.4",
+    "vite": "^3.2.2",
+    "wasm-pack": "^0.10.3"
+  },
+  "prettier": {
+    "semi": false,
+    "printWidth": 100,
+    "trailingComma": "es5"
+  }
+}

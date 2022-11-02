@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES6", 
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "declaration": true,               
+    "outDir": "./dist", 
+    "rootDir": "./src",
+    "strict": true, 
+  },
+  "include": ["src/*.ts"]
+}
