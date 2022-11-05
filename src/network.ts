@@ -1,40 +1,23 @@
 import { CompileOptions } from "./index"
-import {
-  derivative,
-  evaluate,
-  map,
-  matrix,
-  Matrix,
-  multiply,
-  random,
-  subtract,
-  sum,
-  transpose,
-} from "mathjs"
+import { Activation, Loss, Tensor } from "./math"
 
 export interface Layer {
   units: number
-  activation: "sigmoid" | "relu" | "linear" | "softmax"
+  activation: "sigmoid" | "relu" | "linear" | "tanh"
 }
 
 export interface LayerInternal extends Layer {
-  weights: number[]
+  weights: Tensor
 }
 
 export class NeuralNetwork {
   private layers: LayerInternal[]
-  private states: number
-  private actions: number
   private options: CompileOptions
+  private actions: number
+  private states: number
   private alpha: number
 
-  // Allows state to preserve the last state and action.
-  private cache: { input: number[]; output: number[]; weights: number[]; gradients: number[] } = {
-    input: [],
-    output: [],
-    weights: [],
-    gradients: [],
-  }
+  private cache!: Tensor
 
   /**
    * Build the neural network with the specified options.
@@ -54,53 +37,51 @@ export class NeuralNetwork {
     this.actions = actions
     this.options = options
     this.alpha = alpha
-    this.layers = layers.map((l) => ({
-      ...l,
-      weights: Array.from({ length: this.states }, () => random(0, 0.5)),
-    }))
-  }
 
-  /**
-   * Returns the weights for the specified layer.
-   * @param {number} idx The index of the layer to get the weights for.
-   * @returns {number[]} The weights for the specified layer.
-   */
-  weights(idx: number): number[] {
-    return this.layers[idx].weights
-  }
+    if (layers.length === 0) throw new Error("At least one hidden layer is required.")
 
-  /**
-   * Performs a forward pass activation through the network.
-   * @param {number[]} input The input state through the network.
-   * @param {Layer["activation"]} type The type of activation to use. (sigmoid, relu, ...)
-   * @returns {number[]} Result of the activation.
-   */
-  private activate(input: number[], type: Layer["activation"]): number[] {
-    switch (type) {
-      case "linear":
-        return input
-      case "softmax":
-        return input.map((x) => Math.exp(x) / sum(input.map((x) => Math.exp(x))))
-      case "relu":
-        return input.map((x) => Math.max(0, x))
-      case "sigmoid":
-        return input.map((x) => 1 / (1 + Math.exp(-x)))
+    if (layers[layers.length - 1].units !== actions) {
+      throw new Error("The last layer units must match the number of actions.")
     }
+
+    this.layers = layers.map((l, i) => {
+      const input = i === 0 ? states : layers[i - 1].units
+      return {
+        ...l,
+        weights: new Tensor(
+          [l.units, input],
+          Array.from({ length: input * l.units }, () => Math.random() * 0.5)
+        ),
+      }
+    })
+  }
+
+  /**
+   * Performs the activation function for the given input.
+   * @param {Tensor} input The input tensor to perform the activation function on.
+   * @param {Layer["activation"]} type The type of activation to use. (sigmoid, relu, ...)
+   * @returns {Tensor} Result of the activation.
+   */
+  private activate(input: Tensor, type: Layer["activation"]): Tensor {
+    return Activation[type].fn(input)
   }
 
   /**
    * Calculates the Q-values for the given input.
    * @param {number[]} input The current state to give the network.
-   * @returns {Matrix} The optimal Q-value for the given input.
+   * @returns {Tensor} The optimal Q-value for the given input.
    */
   forward(input: number[]): number[] {
-    const z = evaluate("w .* x", { w: this.weights(0), x: input })
-    const output = this.activate(z, this.layers[0].activation)
+    const x = new Tensor([this.states, 1], input)
+    let z: Tensor = x
 
-    // Save values to cache.
-    this.cache = { ...this.cache, input, output, weights: this.weights(0) }
+    this.layers.forEach((l) => {
+      z = l.weights.multiply(z)
+      z = this.activate(z, l.activation)
+    })
 
-    return output
+    this.cache = x
+    return z.data
   }
 
   /**
@@ -108,36 +89,37 @@ export class NeuralNetwork {
    * @param {number[]} target The target state of the network.
    */
   backward(target: number[]): void {
-    // Calculate gradient of loss with respect to activation.
-    const deda = subtract(target, this.cache.output)
-    console.log(deda)
+    const input = this.cache
+    const N = this.layers.length
 
-    // Calculate the gradient of the activation with respect to the weights.
-    const dadz = this.cache.output.map((x) => (x > 0 ? 1 : 0))
-    console.log(dadz)
-    // const dadz: Matrix = evaluate("1", {
-    //   x: matrix([this.cache.output]),
-    // })
+    const outputs: Tensor[] = [input]
+    const errors: Tensor[] = []
 
-    // Calculate the gradient of the loss with respect to the weights.
-    const dedw: Matrix = evaluate("(deda .* dadz) * w", { deda, dadz, w: this.cache.weights })
-    console.log(dedw)
-
-    this.cache.gradients = dedw.toArray() as number[]
-  }
-
-  descend(): void {
-    this.layers[0].weights = evaluate("w + (a .* g)", {
-      w: this.weights(0),
-      a: this.alpha,
-      g: this.cache.gradients,
+    // Forward pass to get outputs of each layer.
+    this.layers.forEach((l, i) => {
+      let z = l.weights.multiply(outputs[i])
+      z = this.activate(z, l.activation)
+      outputs.push(z)
     })
 
-    console.log(this.weights(0))
-  }
+    // Derivative of the loss function.
+    errors[N] = Loss[this.options.loss].derivative(
+      outputs[N],
+      new Tensor([this.actions, 1], target)
+    )
 
-  fit(target: number[]): void {
-    this.backward(target)
-    this.descend()
+    // From last layer, propagate backwards.
+    for (let i = N; i > 0; i--) {
+      let gradient = Activation[this.layers[i - 1].activation].derivative(outputs[i])
+      gradient = gradient.dot(this.alpha)
+      gradient = gradient.dot(errors[i])
+
+      // Update weights.
+      const delta = gradient.multiply(outputs[i - 1].transpose())
+      this.layers[i - 1].weights = this.layers[i - 1].weights.add(delta)
+
+      // Calculate error for next layer.
+      errors[i - 1] = this.layers[i - 1].weights.transpose().multiply(errors[i])
+    }
   }
 }

@@ -1,5 +1,5 @@
 # WASML
-WASM-powered reinforcement learning library written in Rust.
+WebAssembly-powered reinforcement learning library written in Rust and TypeScript. 
 
 ## 🚀 Getting Started
 WASML is available as an NPM package, simply install with the package manager of your choice.

@@ -12,7 +12,7 @@ interface ModelOptions {
 }
 
 export interface CompileOptions {
-  loss: "meanSquaredError" | "hinge"
+  loss: "meanSquaredError" | "meanAbsoluteError"
   optimizer: "sgd" | "adam"
 }
 
