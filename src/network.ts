@@ -57,6 +57,15 @@ export class NeuralNetwork {
   }
 
   /**
+   * Returns the weights of specified layer in the network.
+   * @param {number} idx The index of the layer to get the weights of.
+   * @returns The weights of the specified layer.
+   */
+  weights(idx: number): Tensor {
+    return this.layers[idx].weights
+  }
+
+  /**
    * Performs the activation function for the given input.
    * @param {Tensor} input The input tensor to perform the activation function on.
    * @param {Layer["activation"]} type The type of activation to use. (sigmoid, relu, ...)
@@ -67,9 +76,9 @@ export class NeuralNetwork {
   }
 
   /**
-   * Calculates the Q-values for the given input.
+   * Calculates the forward pass out of specified state.
    * @param {number[]} input The current state to give the network.
-   * @returns {Tensor} The optimal Q-value for the given input.
+   * @returns {Tensor} The result for the given input.
    */
   forward(input: number[]): number[] {
     const x = new Tensor([this.states, 1], input)
@@ -87,8 +96,9 @@ export class NeuralNetwork {
   /**
    * Back-propagates the loss and updates weights.
    * @param {number[]} target The target state of the network.
+   * @param {number} action - Optional index to only reward specific action.
    */
-  backward(target: number[]): void {
+  backward(target: number[], action?: number): void {
     const input = this.cache
     const N = this.layers.length
 
@@ -103,6 +113,7 @@ export class NeuralNetwork {
     })
 
     // Derivative of the loss function.
+    target = target.map((t, i) => (action ? (i === action ? outputs[N].data[i] : t) : t))
     errors[N] = Loss[this.options.loss].derivative(
       outputs[N],
       new Tensor([this.actions, 1], target)

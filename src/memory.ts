@@ -1,8 +1,8 @@
 interface Replay {
-  c: Float32Array
+  c: number[]
   a: number
   r: number
-  n: Float32Array
+  n: number[]
 }
 
 export class Memory {
@@ -13,8 +13,8 @@ export class Memory {
   /**
    * Creates a new memory store for experience replay.
    * @constructor
-   * @param {number} maxSize The maximum size of the memory.
-   * @param {number} batchSize The size of the batch to sample for replay.
+   * @param {number} maxSize - The maximum size of the memory.
+   * @param {number} batchSize - The size of the batch to sample for replay.
    */
   constructor(maxSize: number, batchSize: number) {
     this.batchSize = batchSize
@@ -42,12 +42,12 @@ export class Memory {
 
   /**
    * Adds a new experience to the memory.
-   * @param {Float32Array} state The current state of the environment.
-   * @param {number} action The action taken in the environment.
-   * @param {number} reward The reward given for the action.
-   * @param {Float32Array} next The next state of the environment.
+   * @param {number[]} state - The current state of the environment.
+   * @param {number} action - The action taken in the environment.
+   * @param {number} reward - The reward given for the action.
+   * @param {number[]} next - The next state of the environment.
    */
-  add(state: Float32Array, action: number, reward: number, next: Float32Array): void {
+  add(state: number[], action: number, reward: number, next: number[]): void {
     if (this.memory.length + 1 === this.maxSize) this.memory.shift()
     this.memory.push({ c: state, a: action, r: reward, n: next })
   }
@@ -57,21 +57,5 @@ export class Memory {
    */
   reset(): void {
     this.memory = new Array(this.maxSize)
-  }
-
-  /**
-   * Loads a pre-existing model brain into the network.
-   * @param {Array<Replay> data The memory object to load.
-   */
-  load(data: Array<Replay>): void {
-    this.memory = data
-  }
-
-  /**
-   * Exports the current memory store.
-   * @returns The current state of the memory object.
-   */
-  save(): Array<Replay> {
-    return this.memory
   }
 }

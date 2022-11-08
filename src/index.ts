@@ -1,6 +1,7 @@
 import init, { setup } from "../dist/wasml"
 import { Memory } from "./memory"
 import { Layer, NeuralNetwork } from "./network"
+import { Tensor } from "./math"
 
 interface ModelOptions {
   alpha: number
@@ -13,13 +14,12 @@ interface ModelOptions {
 
 export interface CompileOptions {
   loss: "meanSquaredError" | "meanAbsoluteError"
-  optimizer: "sgd" | "adam"
 }
 
 // The default configurations for the model.
 const DEFAULT_MODEL_OPTIONS: ModelOptions = {
   alpha: 0.1,
-  gamma: 0.6,
+  gamma: 0.9,
   epsilon: 0.1,
   maxMemory: 1000,
   batchSize: 100,
@@ -28,7 +28,6 @@ const DEFAULT_MODEL_OPTIONS: ModelOptions = {
 
 const DEFAULT_COMPILE_OPTIONS: CompileOptions = {
   loss: "meanSquaredError",
-  optimizer: "sgd",
 }
 
 export default class WASML {
@@ -43,7 +42,7 @@ export default class WASML {
   private Target!: NeuralNetwork
   private Memory!: Memory
 
-  private last_state!: Float32Array
+  private last_state!: number[]
   private last_action!: number
   private episode: number = 0
 
@@ -64,10 +63,11 @@ export default class WASML {
     })
   }
 
-  /*
-   * Check that the model has been initialized.
+  /**
+   * Checks if the model has been initialised.
+   * @returns {boolean} - Whether the model has been initialised.
    */
-  initialised(): void {
+  private initialised(): void {
     if (!this.init) {
       throw new Error("A call to `.compile()` is required before interaction is performed!")
     }
@@ -78,7 +78,6 @@ export default class WASML {
    * @param {Layer[]} layers - The array of layers to add to the neural network.
    */
   addLayers(layers: Layer[]): void {
-    this.initialised()
     if (layers.length === 0) throw new Error("No layers were provided.")
     this.layers = [...this.layers, ...layers]
   }
@@ -96,31 +95,31 @@ export default class WASML {
     this.Memory = new Memory(this.options.maxMemory, this.options.batchSize)
 
     // Copy weights from DQN to Target.
-    this.Target.weights(0).set(this.DQN.weights(0))
+    this.Target.weights(0).set(this.DQN.weights(0).data)
 
     this.init = true
   }
 
   /**
    * Trains the model given the input and output data.
-   * @param {Float32Array[]} inputs - The inputs to train the model with.
-   * @param {Float32Array[]} outputs - The outputs to train the model with.
+   * @param {number[][]} inputs - The inputs to train the model with.
+   * @param {number[][]} outputs - The outputs to train the model with.
    */
-  train(inputs: Float32Array[], outputs: Float32Array[]): void {
+  train(inputs: number[][], outputs: number[][]): void {
     this.initialised()
 
     if (inputs.length === 0 || outputs.length === 0 || inputs.length !== outputs.length) {
       throw new Error("The number of inputs and outputs must be equal and greater than 0.")
     }
 
-    console.log(inputs, outputs)
+    // TODO: Train the model with pre-defined data.
   }
 
   /**
    * Predicts the optimal output given the specified input.
-   * @param {Float32Array} input - The state to predict result for.
+   * @param {number[]} input - The state to predict result for.
    */
-  predict(input: Float32Array): number {
+  predict(input: number[]): number {
     this.initialised()
 
     if (input.length !== this.states) {
@@ -131,22 +130,22 @@ export default class WASML {
 
     // Greedy epsilon policy.
     let action: number
+
     if (Math.random() < this.options.epsilon) action = Math.floor(Math.random() * this.actions)
-    else action = this.DQN.action(input)
+    else action = Tensor.argmax(this.DQN.forward(input))
 
     // Keep track of this information for the reward phase.
     this.last_state = input
     this.last_action = action
-
     return action
   }
 
   /**
    * Rewards the model for the previous action.
-   * @param {Float32Array} state - The state to reward the model for.
+   * @param {number[]} state - The next state of the model.
    * @param {number} reward - The reward value to give the model.
    */
-  reward(state: Float32Array, reward: number): void {
+  reward(state: number[], reward: number): void {
     this.initialised()
     this.episode++
 
@@ -157,20 +156,17 @@ export default class WASML {
     const batch = this.Memory.sample()
     if (!batch) return
 
-    console.log(batch)
-    const predicted_qs = batch.map((b) => this.DQN.q(b.c))
-    const target_qs = batch.map((b) => this.Target.q(b.n))
-
     batch.forEach((b) => {
-      const predicted_q = predicted_qs[b.a]
-      const target_q = b.r + this.options.gamma * Math.max(...target_qs)
-      const loss = (predicted_q - target_q) ** 2
-      this.DQN.fit(loss)
+      const target = new Tensor([this.actions, 1], this.Target.forward(b.n))
+        .dot(this.options.gamma)
+        .add(reward).data
+
+      this.DQN.backward(target, b.a)
     })
 
     // Copy the weights from the DQN to the Target every episodeSize.
     if (this.episode % this.options.episodeSize === 0) {
-      this.Target.weights(0).set(this.DQN.weights(0))
+      this.Target.weights(0).set(this.DQN.weights(0).data)
     }
   }
 }

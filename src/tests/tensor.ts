@@ -1,19 +1,19 @@
 import { Tensor } from "../math"
 
+// Some super simple Tensor math tets.
 const a = new Tensor([2, 2], [1, 2, 3, 4])
 const b = new Tensor([2, 2], [1, 2, 3, 4])
-
 const c = new Tensor([1, 2], [3, 16])
 const d = new Tensor([2, 1], [0.3, 0.7])
 
-const add = a.add(b)
-console.log(add)
+// Add.
+console.log(a.add(b))
 
-const sub = a.subtract(b)
-console.log(sub)
+// Subtract.
+console.log(a.subtract(b))
 
-const mul2 = a.dot(2)
-console.log(mul2)
+// Dot product.
+console.log(a.dot(2))
 
-const mul = c.multiply(d)
-console.log(mul)
+// Matrix multiplication.
+console.log(c.multiply(d))

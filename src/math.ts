@@ -7,8 +7,8 @@ export class Tensor {
 
   /**
    * Creates a new tensor with the specified shape.
-   * @param {[number, number]} shape The rows and columns of the tensor.
-   * @param {number[]} data The data for the tensor.
+   * @param {[number, number]} shape - The rows and columns of the tensor.
+   * @param {number[]} data - The data for the tensor.
    */
   constructor(shape: [number, number], data: number[]) {
     if (shape[0] * shape[1] !== data.length)
@@ -20,10 +20,10 @@ export class Tensor {
 
   /**
    * Explicitly sets the data for the tensor.
-   * @param {number[]} data The data to use for the tensor.
+   * @param {number[]} data - The data to use for the tensor.
    */
   set(data: number[]): void {
-    if (data.length !== this.shape[0]) {
+    if (data.length !== this.shape[0] * this.shape[1]) {
       throw new Error("Data must match the shape of the tensor.")
     }
 
@@ -31,10 +31,19 @@ export class Tensor {
   }
 
   /**
+   * Retuns the index of the maximum value in an array.
+   * @param {number[]} arr - The array to find the maximum value in.
+   * @returns {number} - The index of the maximum value in the tensor.
+   */
+  static argmax(arr: number[]): number {
+    return arr.map((x, i) => [x, i]).reduce((r, a) => (a[0] > r[0] ? a : r))[1]
+  }
+
+  /**
    * Gets the data value at the specified row and column.
-   * @param i The row to get.
-   * @param j The column to get.
-   * @returns {number} The value at the specified row and column.
+   * @param i - The row to get.
+   * @param j - The column to get.
+   * @returns {number} - The value at the specified row and column.
    */
   private at(i: number, j: number): number {
     return this.data[i * this.shape[1] + j]
@@ -42,7 +51,7 @@ export class Tensor {
 
   /**
    * Checks that the current tensor shape is equal to the specified tensor.
-   * @param {Tensor} t The tensor to check the shape against.
+   * @param {Tensor} t - The tensor to check the shape against.
    */
   private compare(t: Tensor): void {
     if (this.shape[0] !== t.shape[0] || this.shape[1] !== t.shape[1]) {
@@ -52,8 +61,8 @@ export class Tensor {
 
   /**
    * Adds the specified tensor or number to the current tensor.
-   * @param {Tensor | number} other The tensor or number to add to the current tensor.
-   * @returns {Tensor} The resulting tensor.
+   * @param {Tensor | number} other - The tensor or number to add to the current tensor.
+   * @returns {Tensor} - The resulting tensor.
    */
   add(other: Tensor | number): Tensor {
     if (other instanceof Tensor) this.compare(other)
@@ -63,8 +72,8 @@ export class Tensor {
 
   /**
    * Subtracts the specified tensor to the current tensor.
-   * @param {Tensor} other The tensor to subtract from the current tensor.
-   * @returns {Tensor} The resulting tensor.
+   * @param {Tensor} other - The tensor to subtract from the current tensor.
+   * @returns {Tensor} - The resulting tensor.
    */
   subtract(other: Tensor | number): Tensor {
     if (other instanceof Tensor) this.compare(other)
@@ -74,8 +83,8 @@ export class Tensor {
 
   /**
    * Multiplies the current tensor by the specified tensor.
-   * @param {Tensor} other The tensor to multiply the current tensor by.
-   * @returns {Tensor} The resulting tensor.
+   * @param {Tensor} other - The tensor to multiply the current tensor by.
+   * @returns {Tensor} - The resulting tensor.
    */
   multiply(other: Tensor): Tensor {
     if (this.shape[1] !== other.shape[0])
@@ -99,8 +108,8 @@ export class Tensor {
 
   /**
    * Calculates the element-wise multiplication of the current tensor and the specified tensor.
-   * @param {Tensor | number} other The tensor or number to multiply the current tensor by.
-   * @returns {Tensor} The resulting tensor.
+   * @param {Tensor | number} other - The tensor or number to multiply the current tensor by.
+   * @returns {Tensor} - The resulting tensor.
    */
   dot(other: Tensor | number): Tensor {
     if (other instanceof Tensor) this.compare(other)
@@ -110,7 +119,7 @@ export class Tensor {
 
   /**
    * Transposes the current tensor.
-   * @returns {Tensor} The transposed tensor.
+   * @returns {Tensor} - The transposed tensor.
    */
   transpose(): Tensor {
     const data = new Tensor([this.shape[1], this.shape[0]], new Array(this.data.length).fill(0))
@@ -124,7 +133,7 @@ export class Tensor {
 
   /**
    * Calculates the sum of the current tensor.
-   * @returns {number} The sum of all the values in the tensor.
+   * @returns {number} - The sum of all the values in the tensor.
    */
   sum(): number {
     return this.data.reduce((a, b) => a + b, 0)
@@ -132,8 +141,8 @@ export class Tensor {
 
   /**
    * Maps the current tensor to the specified function.
-   * @param {Function} fn The function to map the tensor to.
-   * @returns {Tensor} The resulting tensor.
+   * @param {Function} fn - The function to map the tensor to.
+   * @returns {Tensor} - The resulting tensor.
    */
   map(fn: (x: number, i: number) => number): Tensor {
     const data = this.data.map(fn)
@@ -183,9 +192,4 @@ export const Loss: Record<
         .sum() / x.data.length,
     derivative: (x, y) => y.subtract(x).map((n) => (n > 0 ? 1 : -1)),
   },
-}
-
-export const Optimizer: Record<CompileOptions["optimizer"], (x: Tensor, y: Tensor) => Tensor> = {
-  sgd: (x, y) => x.subtract(y),
-  adam: (x, y) => x.subtract(y),
 }
