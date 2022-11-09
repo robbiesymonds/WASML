@@ -134,6 +134,8 @@ export default class WASML {
     if (Math.random() < this.options.epsilon) action = Math.floor(Math.random() * this.actions)
     else action = Tensor.argmax(this.DQN.forward(input))
 
+    console.log(this.DQN.forward(input))
+
     // Keep track of this information for the reward phase.
     this.last_state = input
     this.last_action = action
@@ -145,7 +147,7 @@ export default class WASML {
    * @param {number[]} state - The next state of the model.
    * @param {number} reward - The reward value to give the model.
    */
-  reward(state: number[], reward: number): void {
+  reward(reward: number, state: number[]): void {
     this.initialised()
     this.episode++
 
@@ -156,13 +158,13 @@ export default class WASML {
     const batch = this.Memory.sample()
     if (!batch) return
 
-    batch.forEach((b) => {
+    for (const b of batch) {
       const target = new Tensor([this.actions, 1], this.Target.forward(b.n))
         .dot(this.options.gamma)
         .add(reward).data
 
-      this.DQN.backward(target, b.a)
-    })
+      this.DQN.backward(target, b.a, this.options.batchSize)
+    }
 
     // Copy the weights from the DQN to the Target every episodeSize.
     if (this.episode % this.options.episodeSize === 0) {

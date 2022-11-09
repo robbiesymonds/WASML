@@ -97,8 +97,9 @@ export class NeuralNetwork {
    * Back-propagates the loss and updates weights.
    * @param {number[]} target The target state of the network.
    * @param {number} action - Optional index to only reward specific action.
+   * @param {number} batchSize - Optional batch size to use for scaling impact of loss.
    */
-  backward(target: number[], action?: number): void {
+  backward(target: number[], action?: number, batchSize?: number): void {
     const input = this.cache
     const N = this.layers.length
 
@@ -118,6 +119,8 @@ export class NeuralNetwork {
       outputs[N],
       new Tensor([this.actions, 1], target)
     )
+
+    if (batchSize) errors[N] = errors[N].dot(1 / batchSize)
 
     // From last layer, propagate backwards.
     for (let i = N; i > 0; i--) {
