@@ -2,11 +2,15 @@ import init, { setup } from "../dist/wasml"
 import { Memory } from "./memory"
 import { Layer, NeuralNetwork } from "./network"
 import { Tensor } from "./math"
+import { Table } from "./table"
 
-interface ModelOptions {
+export interface BaseOptions {
   alpha: number
   gamma: number
   epsilon: number
+}
+
+interface ModelOptions extends BaseOptions {
   maxMemory: number
   batchSize: number
   episodeSize: number
@@ -30,6 +34,11 @@ const DEFAULT_COMPILE_OPTIONS: CompileOptions = {
   loss: "meanSquaredError",
 }
 
+enum Mode {
+  TABLE,
+  MODEL,
+}
+
 export default class WASML {
   private init: boolean = false
   private states: number = Infinity
@@ -37,10 +46,12 @@ export default class WASML {
   private options: ModelOptions = DEFAULT_MODEL_OPTIONS
   private config: CompileOptions = DEFAULT_COMPILE_OPTIONS
   private layers: Layer[] = []
+  private mode!: Mode
 
   private DQN!: NeuralNetwork
   private Target!: NeuralNetwork
   private Memory!: Memory
+  private QTable!: Table
 
   private last_state!: number[]
   private last_action!: number
@@ -55,11 +66,23 @@ export default class WASML {
   async model(states: number, actions: number, options?: Partial<ModelOptions>): Promise<void> {
     this.states = states
     this.actions = actions
+    this.options = { ...DEFAULT_MODEL_OPTIONS, ...options }
 
     await init().then(() => {
-      const config = { ...DEFAULT_MODEL_OPTIONS, ...options }
-      setup(actions, states)
-      this.options = config
+      this.mode = Mode.MODEL
+      setup(states, actions)
+    })
+  }
+
+  async table(states: number, actions: number, options?: Partial<BaseOptions>): Promise<void> {
+    this.states = states
+    this.actions = actions
+    this.options = { ...DEFAULT_MODEL_OPTIONS, ...options }
+    this.QTable = new Table(states, actions)
+
+    await init().then(() => {
+      this.mode = Mode.TABLE
+      setup(states, actions)
     })
   }
 
@@ -68,7 +91,7 @@ export default class WASML {
    * @returns {boolean} - Whether the model has been initialised.
    */
   private initialised(): void {
-    if (!this.init) {
+    if (!this.init && this.mode === Mode.MODEL) {
       throw new Error("A call to `.compile()` is required before interaction is performed!")
     }
   }
@@ -78,6 +101,9 @@ export default class WASML {
    * @param {Layer[]} layers - The array of layers to add to the neural network.
    */
   addLayers(layers: Layer[]): void {
+    if (this.mode === Mode.TABLE) throw new Error("Layers are not supported for table mode.")
+    if (this.mode !== Mode.MODEL) throw new Error("Model must be initialised before adding layers.")
+
     if (layers.length === 0) throw new Error("No layers were provided.")
     this.layers = [...this.layers, ...layers]
   }
@@ -88,6 +114,14 @@ export default class WASML {
    */
   compile(options: Partial<CompileOptions>): void {
     this.config = { ...DEFAULT_COMPILE_OPTIONS, ...options }
+
+    if (this.mode === undefined)
+      throw new Error("Model or table must be initialised before compiling.")
+
+    if (this.mode === Mode.TABLE) {
+      console.warn('A call to ".compile()" is not required for table mode.')
+      return
+    }
 
     const { states, actions, layers, config } = this
     this.DQN = new NeuralNetwork(states, actions, layers, config, this.options.alpha)
@@ -122,7 +156,7 @@ export default class WASML {
   predict(input: number[]): number {
     this.initialised()
 
-    if (input.length !== this.states) {
+    if (this.mode === Mode.MODEL && input.length !== this.states) {
       throw new Error(
         `The number of inputs does not match the required size. (${input.length} !== ${this.states})`
       )
@@ -132,9 +166,11 @@ export default class WASML {
     let action: number
 
     if (Math.random() < this.options.epsilon) action = Math.floor(Math.random() * this.actions)
-    else action = Tensor.argmax(this.DQN.forward(input))
-
-    console.log(this.DQN.forward(input))
+    else {
+      // Determine source from mode.
+      if (this.mode === Mode.TABLE) action = Tensor.argmax(this.QTable.get(input))
+      else action = Tensor.argmax(this.DQN.forward(input))
+    }
 
     // Keep track of this information for the reward phase.
     this.last_state = input
@@ -151,24 +187,38 @@ export default class WASML {
     this.initialised()
     this.episode++
 
-    // Add the new sample to memory.
-    this.Memory.add(this.last_state, this.last_action, reward, state)
+    // Table specific reward logic.
+    if (this.mode === Mode.TABLE) {
+      const current = this.QTable.get(this.last_state)[this.last_action]
+      const next = this.QTable.get(state)
 
-    // Sample a random batch from memory.
-    const batch = this.Memory.sample()
-    if (!batch) return
+      // Bellman equation.
+      const target = reward + this.options.gamma * Math.max(...next)
+      const q = current + this.options.alpha * (target - current)
+      this.QTable.set(this.last_state, this.last_action, q)
+      return
 
-    for (const b of batch) {
-      const target = new Tensor([this.actions, 1], this.Target.forward(b.n))
-        .dot(this.options.gamma)
-        .add(reward).data
+      // Model specific reward logic.
+    } else {
+      // Add the new sample to memory.
+      this.Memory.add(this.last_state, this.last_action, reward, state)
 
-      this.DQN.backward(target, b.a, this.options.batchSize)
-    }
+      // Sample a random batch from memory.
+      const batch = this.Memory.sample()
+      if (!batch) return
 
-    // Copy the weights from the DQN to the Target every episodeSize.
-    if (this.episode % this.options.episodeSize === 0) {
-      this.Target.weights(0).set(this.DQN.weights(0).data)
+      for (const b of batch) {
+        const target = new Tensor([this.actions, 1], this.Target.forward(b.n))
+          .dot(this.options.gamma)
+          .add(reward).data
+
+        this.DQN.backward(target, b.a, this.options.batchSize)
+      }
+
+      // Copy the weights from the DQN to the Target every episodeSize.
+      if (this.episode % this.options.episodeSize === 0) {
+        this.Target.weights(0).set(this.DQN.weights(0).data)
+      }
     }
   }
 }

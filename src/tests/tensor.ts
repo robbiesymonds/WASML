@@ -1,6 +1,6 @@
 import { Tensor } from "../math"
 
-// Some super simple Tensor math tets.
+// Some super simple Tensor math tests.
 const a = new Tensor([2, 2], [1, 2, 3, 4])
 const b = new Tensor([2, 2], [1, 2, 3, 4])
 const c = new Tensor([1, 2], [3, 16])

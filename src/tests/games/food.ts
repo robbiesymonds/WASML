@@ -1,20 +1,34 @@
 const SIZE = 500
-const GRID = 30
 
 export default class FoodGame {
   private axis: number = 0 // 0 = up, 1 = right, 2 = down, 3 = left
   private ctx: CanvasRenderingContext2D
-  private player: [number, number] = [GRID / 2, GRID / 2]
-  private food: [number, number] = [GRID / 2, GRID / 2]
+  private player: [number, number]
+  private food: [number, number]
+  private size: number
 
-  constructor() {
+  private last_dist!: number
+
+  constructor(size: number) {
     const canvas = document.createElement("canvas")
     this.ctx = canvas.getContext("2d")!
     document.body.appendChild(canvas)
-    canvas.width = SIZE
     canvas.height = SIZE
+    canvas.width = SIZE
+    this.size = size
+
+    this.player = [this.size / 2, this.size / 2]
+    this.food = this.random()
 
     this.render()
+  }
+
+  random(): [number, number] {
+    return [Math.floor(Math.random() * this.size), Math.floor(Math.random() * this.size)]
+  }
+
+  dist() {
+    return Math.sqrt((this.food[1] - this.player[1]) ** 2 + (this.food[0] - this.player[0]) ** 2)
   }
 
   state() {
@@ -24,11 +38,9 @@ export default class FoodGame {
       down: this.food[1] > this.player[1] ? 1 : 0,
       left: this.food[0] < this.player[0] ? 1 : 0,
       right: this.food[0] > this.player[0] ? 1 : 0,
-      dist: Math.floor(
-        Math.sqrt((this.food[1] - this.player[1]) ** 2 + (this.food[0] - this.player[0]) ** 2)
-      ),
     }
 
+    this.last_dist = this.dist()
     return Object.values(state)
   }
 
@@ -63,37 +75,26 @@ export default class FoodGame {
   }
 
   reward() {
-    // Check if collided with wall.
-    if (
-      this.player[0] < 0 ||
-      this.player[0] >= GRID ||
-      this.player[1] < 0 ||
-      this.player[1] >= GRID
-    ) {
-      // Respawn the player.
-      this.player = [GRID / 2, GRID / 2]
+    const S = this.size
+
+    // Check if collided with wall and respawn if so.
+    if (this.player[0] < 0 || this.player[0] >= S || this.player[1] < 0 || this.player[1] >= S) {
+      this.player = [S / 2, S / 2]
       return -10.0
     }
 
-    //  Check has got the food.
+    //  Check has got the food and respawn if so.
     if (this.player[0] === this.food[0] && this.player[1] === this.food[1]) {
-      // Respawn the food elsewhere.
-      this.food = [Math.floor(Math.random() * GRID), Math.floor(Math.random() * GRID)]
+      this.food = this.random()
       return 100.0
     }
 
-    // Otherwise negative reward, the closer the food, the less penalty.
-    return (
-      (-1 *
-        Math.floor(
-          Math.sqrt((this.food[1] - this.player[1]) ** 2 + (this.food[0] - this.player[0]) ** 2)
-        )) /
-      GRID
-    )
+    // Otherwise negative reward.
+    return this.dist() <= this.last_dist ? 0.1 : -0.1
   }
 
   render() {
-    const U = SIZE / GRID
+    const U = SIZE / this.size
     this.ctx.fillStyle = "#000"
     this.ctx.fillRect(0, 0, SIZE, SIZE)
 
