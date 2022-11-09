@@ -90,7 +90,7 @@ export default class FoodGame {
     }
 
     // Otherwise negative reward.
-    return this.dist() <= this.last_dist ? 0.1 : -0.1
+    return this.dist() < this.last_dist ? 0.05 : -0.1
   }
 
   render() {

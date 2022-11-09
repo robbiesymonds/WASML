@@ -27,5 +27,8 @@
     "semi": false,
     "printWidth": 100,
     "trailingComma": "es5"
+  },
+  "dependencies": {
+    "reinforce-js": "^1.5.1"
   }
 }

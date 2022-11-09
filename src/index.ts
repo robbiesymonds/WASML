@@ -8,6 +8,7 @@ export interface BaseOptions {
   alpha: number
   gamma: number
   epsilon: number
+  epsilonDecay: boolean
 }
 
 interface ModelOptions extends BaseOptions {
@@ -23,11 +24,12 @@ export interface CompileOptions {
 // The default configurations for the model.
 const DEFAULT_MODEL_OPTIONS: ModelOptions = {
   alpha: 0.1,
-  gamma: 0.9,
+  gamma: 0.95,
   epsilon: 0.1,
   maxMemory: 1000,
   batchSize: 100,
   episodeSize: 50,
+  epsilonDecay: false, // causes a decay to deterministic behavior over ~30,000 steps.
 }
 
 const DEFAULT_COMPILE_OPTIONS: CompileOptions = {
@@ -172,6 +174,9 @@ export default class WASML {
       else action = Tensor.argmax(this.DQN.forward(input))
     }
 
+    // Decrease epsilon.
+    if (this.options.epsilonDecay) this.options.epsilon *= 0.9999
+
     // Keep track of this information for the reward phase.
     this.last_state = input
     this.last_action = action
@@ -208,11 +213,8 @@ export default class WASML {
       if (!batch) return
 
       for (const b of batch) {
-        const target = new Tensor([this.actions, 1], this.Target.forward(b.n))
-          .dot(this.options.gamma)
-          .add(reward).data
-
-        this.DQN.backward(target, b.a, this.options.batchSize)
+        const target = b.r + this.options.gamma * Math.max(...this.Target.forward(b.n))
+        this.DQN.backward(target, b.a)
       }
 
       // Copy the weights from the DQN to the Target every episodeSize.
@@ -220,5 +222,13 @@ export default class WASML {
         this.Target.weights(0).set(this.DQN.weights(0).data)
       }
     }
+  }
+
+  import(): void {
+    // TODO: Import the model from a file.
+  }
+
+  export(): void {
+    // TODO: Export the model to a file.
   }
 }

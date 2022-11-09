@@ -96,10 +96,8 @@ export class NeuralNetwork {
   /**
    * Back-propagates the loss and updates weights.
    * @param {number[]} target The target state of the network.
-   * @param {number} action - Optional index to only reward specific action.
-   * @param {number} batchSize - Optional batch size to use for scaling impact of loss.
    */
-  backward(target: number[], action?: number, batchSize?: number): void {
+  backward(target: number[] | number, action: number): void {
     const input = this.cache
     const N = this.layers.length
 
@@ -114,19 +112,23 @@ export class NeuralNetwork {
     })
 
     // Derivative of the loss function.
-    target = target.map((t, i) => (action ? (i === action ? outputs[N].data[i] : t) : t))
-    errors[N] = Loss[this.options.loss].derivative(
-      outputs[N],
-      new Tensor([this.actions, 1], target)
-    )
-
-    if (batchSize) errors[N] = errors[N].dot(1 / batchSize)
+    if (typeof target === "number") {
+      const y = outputs[N]
+      y.data[action] = target
+      errors[N] = Loss[this.options.loss].derivative(outputs[N], y)
+    } else {
+      errors[N] = Loss[this.options.loss].derivative(
+        outputs[N],
+        new Tensor([this.actions, 1], target)
+      )
+    }
 
     // From last layer, propagate backwards.
     for (let i = N; i > 0; i--) {
-      let gradient = Activation[this.layers[i - 1].activation].derivative(outputs[i])
-      gradient = gradient.dot(this.alpha)
-      gradient = gradient.dot(errors[i])
+      const gradient = Activation[this.layers[i - 1].activation]
+        .derivative(outputs[i])
+        .dot(this.alpha)
+        .dot(errors[i])
 
       // Update weights.
       const delta = gradient.multiply(outputs[i - 1].transpose())

@@ -5,7 +5,7 @@ import { Layer, NeuralNetwork } from "../network"
 const LAYERS: Layer[] = [
   {
     activation: "sigmoid",
-    units: 8,
+    units: 16,
   },
   {
     activation: "sigmoid",
