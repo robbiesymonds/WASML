@@ -14,7 +14,7 @@
   "scripts": {
     "build": "rm -rf dist/ && wasm-pack build --out-dir dist --target web && tsc && yarn clean",
     "clean": "rm dist/.gitignore && rm dist/package.json",
-    "dev": "vite ./src/tests --port 3000",
+    "dev": "vite ./tests --port 3000",
     "test": "npm pack --dry-run",
     "publish": "npm publish"
   },

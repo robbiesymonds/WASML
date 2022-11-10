@@ -1,6 +1,6 @@
-import WASML from "../index"
-import { Tensor } from "../math"
-import { Layer, NeuralNetwork } from "../network"
+import WASML from "../src/index"
+import { Tensor } from "../src/math"
+import { Layer, NeuralNetwork } from "../src/network"
 
 const main = async () => {
   await WASML.load()

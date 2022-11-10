@@ -1,5 +1,5 @@
-import { Tensor } from "../math"
-import WASML from "../index"
+import { Tensor } from "../src/math"
+import WASML from "../src/index"
 
 const main = async () => {
   // Must be run to initialise WASM memory.
