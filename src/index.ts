@@ -1,4 +1,4 @@
-import init, { setup } from "../dist/wasml"
+import init from "../dist/wasml"
 import { Memory } from "./memory"
 import { Layer, NeuralNetwork } from "./network"
 import { Tensor } from "./math"
@@ -60,6 +60,14 @@ export default class WASML {
   private episode: number = 0
 
   /**
+   * Loads the WASM binary into the browser.
+   * @returns {Promise<void>} - A promise that resolves when the WASM binary has been loaded.
+   */
+  static async load(): Promise<void> {
+    await init()
+  }
+
+  /**
    * Generates a model with the given options.
    * @param {number} states - The size of the input vector space for the model.
    * @param {number} actions - The number of actions the model can take.
@@ -70,9 +78,8 @@ export default class WASML {
     this.actions = actions
     this.options = { ...DEFAULT_MODEL_OPTIONS, ...options }
 
-    await init().then(() => {
+    await WASML.load().then(() => {
       this.mode = Mode.MODEL
-      setup(states, actions)
     })
   }
 
@@ -82,9 +89,8 @@ export default class WASML {
     this.options = { ...DEFAULT_MODEL_OPTIONS, ...options }
     this.QTable = new Table(states, actions)
 
-    await init().then(() => {
+    await WASML.load().then(() => {
       this.mode = Mode.TABLE
-      setup(states, actions)
     })
   }
 

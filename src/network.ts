@@ -97,7 +97,7 @@ export class NeuralNetwork {
    * Back-propagates the loss and updates weights.
    * @param {number[]} target The target state of the network.
    */
-  backward(target: number[] | number, action: number): void {
+  backward(target: number[] | number, action?: number): void {
     const input = this.cache
     const N = this.layers.length
 
@@ -113,6 +113,9 @@ export class NeuralNetwork {
 
     // Derivative of the loss function.
     if (typeof target === "number") {
+      if (action === undefined)
+        throw new Error("An action index must be specified when target is a number.")
+
       const y = outputs[N]
       y.data[action] = target
       errors[N] = Loss[this.options.loss].derivative(outputs[N], y)

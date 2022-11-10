@@ -1,5 +1,17 @@
 import { CompileOptions } from "."
 import { Layer } from "./network"
+import {
+  add_matrix,
+  add_scalar,
+  subtract_matrix,
+  subtract_scalar,
+  argmax,
+  dot_matrix,
+  dot_scalar,
+  transpose,
+  sum,
+  multiply,
+} from "../dist/wasml"
 
 export class Tensor {
   data: number[]
@@ -36,7 +48,7 @@ export class Tensor {
    * @returns {number} - The index of the maximum value in the tensor.
    */
   static argmax(arr: number[]): number {
-    return arr.map((x, i) => [x, i]).reduce((r, a) => (a[0] > r[0] ? a : r))[1]
+    return argmax(new Float64Array(arr)) ?? 0
   }
 
   /**
@@ -52,11 +64,13 @@ export class Tensor {
   /**
    * Checks that the current tensor shape is equal to the specified tensor.
    * @param {Tensor} t - The tensor to check the shape against.
+   * @returns {boolean} - Whether or not the matrices are equal.
    */
-  private compare(t: Tensor): void {
+  private compare(t: Tensor): boolean {
     if (this.shape[0] !== t.shape[0] || this.shape[1] !== t.shape[1]) {
       throw new Error("Dimensions of tensors must match.")
     }
+    return true
   }
 
   /**
@@ -65,9 +79,12 @@ export class Tensor {
    * @returns {Tensor} - The resulting tensor.
    */
   add(other: Tensor | number): Tensor {
+    let data = new Float64Array(this.data)
     if (other instanceof Tensor) this.compare(other)
-    const data = this.data.map((v, i) => v + (other instanceof Tensor ? other.data[i] : other))
-    return new Tensor(this.shape, data)
+    if (other instanceof Tensor) data = add_matrix(data, new Float64Array(other.data))
+    else data = add_scalar(data, other)
+
+    return new Tensor(this.shape, Array.from(data))
   }
 
   /**
@@ -76,9 +93,12 @@ export class Tensor {
    * @returns {Tensor} - The resulting tensor.
    */
   subtract(other: Tensor | number): Tensor {
+    let data = new Float64Array(this.data)
     if (other instanceof Tensor) this.compare(other)
-    const data = this.data.map((v, i) => v - (other instanceof Tensor ? other.data[i] : other))
-    return new Tensor(this.shape, data)
+    if (other instanceof Tensor) data = subtract_matrix(data, new Float64Array(other.data))
+    else data = subtract_scalar(data, other)
+
+    return new Tensor(this.shape, Array.from(data))
   }
 
   /**
@@ -90,20 +110,15 @@ export class Tensor {
     if (this.shape[1] !== other.shape[0])
       throw new Error("Invalid dimensions for matrix multiplication.")
 
-    const data = new Tensor(
-      [this.shape[0], other.shape[1]],
-      new Array(this.shape[0] * other.shape[1]).fill(0)
+    let data = multiply(
+      new Float64Array(this.data),
+      new Float64Array(other.data),
+      this.shape[0],
+      other.shape[1],
+      this.shape[1]
     )
 
-    for (let i = 0; i < data.shape[0]; i++) {
-      for (let j = 0; j < data.shape[1]; j++) {
-        let sum: number = 0
-        for (let k = 0; k < this.shape[1]; k++) sum += this.at(i, k) * other.at(k, j)
-        data.data[i * data.shape[1] + j] = sum
-      }
-    }
-
-    return data
+    return new Tensor([this.shape[0], other.shape[1]], Array.from(data))
   }
 
   /**
@@ -112,9 +127,12 @@ export class Tensor {
    * @returns {Tensor} - The resulting tensor.
    */
   dot(other: Tensor | number): Tensor {
+    let data = new Float64Array(this.data)
     if (other instanceof Tensor) this.compare(other)
-    const data = this.data.map((v, i) => v * (other instanceof Tensor ? other.data[i] : other))
-    return new Tensor(this.shape, data)
+    if (other instanceof Tensor) data = dot_matrix(data, new Float64Array(other.data))
+    else data = dot_scalar(data, other)
+
+    return new Tensor(this.shape, Array.from(data))
   }
 
   /**
@@ -122,13 +140,8 @@ export class Tensor {
    * @returns {Tensor} - The transposed tensor.
    */
   transpose(): Tensor {
-    const data = new Tensor([this.shape[1], this.shape[0]], new Array(this.data.length).fill(0))
-    for (let i = 0; i < this.shape[0]; i++) {
-      for (let j = 0; j < this.shape[1]; j++) {
-        data.data[j * data.shape[1] + i] = this.at(i, j)
-      }
-    }
-    return data
+    const data = transpose(new Float64Array(this.data), this.shape[0], this.shape[1])
+    return new Tensor([this.shape[1], this.shape[0]], Array.from(data))
   }
 
   /**
@@ -136,7 +149,7 @@ export class Tensor {
    * @returns {number} - The sum of all the values in the tensor.
    */
   sum(): number {
-    return this.data.reduce((a, b) => a + b, 0)
+    return sum(new Float64Array(this.data))
   }
 
   /**
