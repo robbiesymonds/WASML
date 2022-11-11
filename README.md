@@ -1,4 +1,4 @@
-<img src="src/tests/favicon.ico" width="100"  />
+<img src="tests/favicon.ico" width="100"  />
 
 # WASML
 
@@ -27,6 +27,9 @@ const wasml = new WASML()
 // Create a model with 16 inputs and 3 action states.
 await wasml.model(16, 3) // See below for full configuration options.
 
+// Using `wasml.table(16, 3)` instead will solve this game far quicker!
+// * Tabular optimisation becomes less feasible as state space grows (only 40x40=1600 states here)
+
 // Add two hidden layers.
 wasml.addLayers([
   { units: 32, activation: "sigmoid" },
@@ -49,7 +52,7 @@ const result = wasml.predict(input)
 // [?] Do something with the action.
 
 // Reward the model.
-wasml.reward(1.0)
+wasml.reward(10.0)
 ```
 
 #### Import/Export
@@ -59,11 +62,11 @@ import WASML from "wasml"
 const wasml = new WASML()
 
 // Load an exported model and restore the memory.
-const model = fetch('export.json')
-await wasml.load(model)
+const model = await fetch('export.json').then(res => res.text())
+wasml.import(model)
 
 // Get the memory of the changed model in JSON form.
-const json = await wasml.save()
+const json = wasml.export()
 ```
 
 #### Custom Neural Network
@@ -103,8 +106,16 @@ for (let i = 0; i < 10000; i++) {
 console.log("Test 1: ", NN.forward([10, 20]))
 console.log("Test 2: ", NN.forward([500, 1]))
 console.log("Test 3: ", NN.forward([0.7, 0.99]))
-
 ```
 
 ## ⚙️ Configuration
-Text
+The following are collection of optional parameters that can be passed as options to WASML.
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+`alpha`|number| 0.1 | The learning rate of the model. |
+`gamma`|number| 0.95 | The reward discount factor, usually in range (0, 1).
+`epsilon`|number| 0.1 | The probability of performing a random action.
+`maxMemory`|number| 1000 | The size of the experience replay memory.
+`batchSize`|number| 100 | The number of experiences to sample each iteration.
+`episodeSize`|number| 50 | The number of iterations before updating target network.
+`epsilonDecay`|number| 1000000 | The number of iterations over which epsilon tends to zero.

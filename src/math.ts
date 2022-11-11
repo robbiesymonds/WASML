@@ -163,6 +163,9 @@ export class Tensor {
   }
 }
 
+/**
+ * Common activation functions.
+ */
 export const Activation: Record<
   Layer["activation"],
   { fn: (x: Tensor) => Tensor; derivative: (x: Tensor) => Tensor }
@@ -185,6 +188,9 @@ export const Activation: Record<
   },
 }
 
+/**
+ * Common loss functions.
+ */
 export const Loss: Record<
   CompileOptions["loss"],
   { fn: (x: Tensor, y: Tensor) => number; derivative: (x: Tensor, y: Tensor) => Tensor }

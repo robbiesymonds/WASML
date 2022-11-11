@@ -90,7 +90,7 @@ export default class WASML {
 
   /**
    * Uses Andrej Karpathy's method to train the model.
-   * @note For some reason, the new implementation still won't generalise to small losses, so this method is included for now.
+   * @note For some reason, the `.model()` method trains significantly slower than this method, so keeping it for now.
    * @param {number} states - The size of the input vector space for the model.
    * @param {number} actions - The number of actions the model can take.
    * @param {ModelOptions} options - The options for the model.
@@ -275,6 +275,10 @@ export default class WASML {
     }
   }
 
+  /**
+   * Imports model weights from an previously exported source.
+   * @param {string} data - The JSON data to import in string form.
+   */
   import(data: string): void {
     try {
       const json = JSON.parse(data)
@@ -306,6 +310,10 @@ export default class WASML {
     }
   }
 
+  /**
+   * Exports the model weights to a JSON string.
+   * @returns {string} - The exported model weights and other information.
+   */
   export(): string {
     const data = {
       m: this.mode,
@@ -314,18 +322,9 @@ export default class WASML {
       w: undefined as any,
     }
 
-    switch (this.mode) {
-      case Mode.TABLE:
-        data.w = this.QTable.save()
-        break
-      case Mode.MODEL:
-        data.w = this.DQN.save()
-        break
-      case Mode.KARPARTHY:
-        data.w = this.KARPATHY.toJSON()
-        break
-    }
-
+    if (this.mode === Mode.MODEL) data.w = this.DQN.save()
+    else if (this.mode === Mode.TABLE) data.w = this.QTable.save()
+    else if (this.mode === Mode.KARPARTHY) data.w = this.KARPATHY.toJSON()
     return JSON.stringify(data)
   }
 }

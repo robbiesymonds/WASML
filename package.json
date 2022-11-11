@@ -15,8 +15,7 @@
     "build": "rm -rf dist/ && wasm-pack build --out-dir dist --target web && tsc && yarn clean",
     "clean": "rm dist/.gitignore && rm dist/package.json",
     "dev": "vite ./tests --port 3000",
-    "test": "npm pack --dry-run",
-    "publish": "npm publish"
+    "test": "npm pack --dry-run"
   },
   "devDependencies": {
     "typescript": "^4.8.4",
