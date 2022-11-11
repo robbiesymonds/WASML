@@ -1,2 +1,2 @@
-tests/** linguist-vendored
-src/lib/** linguist-vendored
+/tests/** linguist-vendored
+/src/lib/** linguist-vendored
