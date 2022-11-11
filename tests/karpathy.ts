@@ -1,13 +1,24 @@
-import WASML from "../src/index"
 import FoodGame from "./games/food"
+import WASML from "../src/index"
 
-// Uses the Q-Table method to teach a bot to find food.
+// Uses the DQN to teach a bot to find food.
 const main = async () => {
   const game = new FoodGame(40)
   const wasml = new WASML()
 
-  // 40x40 grid -> 1600 possible states.
-  await wasml.table(5, 3, { epsilon: 0.1, alpha: 0.1, epsilonDecay: 100 })
+  await wasml.karparthy(5, 3, {
+    epsilon: 0.01,
+    alpha: 0.01,
+    gamma: 0.975,
+    episodeSize: 50,
+    batchSize: 300,
+    maxMemory: 1e6,
+    epsilonDecay: 1e6,
+  })
+
+  // Import pre-trained model.
+  const model = await fetch("./saves/food.json").then((res) => res.text())
+  wasml.import(model)
 
   // Runs the game loop.
   // - The state consists of 5 values: the movement direction, and 4 values indicating whether the food is above, below, left, or right of the bot.

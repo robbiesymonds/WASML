@@ -16,7 +16,6 @@ export class NeuralNetwork {
   private actions: number
   private states: number
   private alpha: number
-
   private cache!: Tensor
 
   /**
@@ -95,9 +94,11 @@ export class NeuralNetwork {
 
   /**
    * Back-propagates the loss and updates weights.
-   * @param {number[]} target The target state of the network.
+   * @param {number[]} target - The target state of the network.
+   * @param {number} action - Specific index of the action to update.
+   * @param {number} multiplier - An optional multiplier to apply to the loss.
    */
-  backward(target: number[] | number, action?: number): void {
+  backward(target: number[] | number, action?: number, multiplier?: number): void {
     const input = this.cache
     const N = this.layers.length
 
@@ -112,19 +113,19 @@ export class NeuralNetwork {
     })
 
     // Derivative of the loss function.
+    let y: Tensor
     if (typeof target === "number") {
-      if (action === undefined)
+      if (action === undefined) {
         throw new Error("An action index must be specified when target is a number.")
-
-      const y = outputs[N]
-      y.data[action] = target
-      errors[N] = Loss[this.options.loss].derivative(outputs[N], y)
+      } else {
+        y = outputs[N]
+        y.data[action] = target
+      }
     } else {
-      errors[N] = Loss[this.options.loss].derivative(
-        outputs[N],
-        new Tensor([this.actions, 1], target)
-      )
+      y = new Tensor([this.actions, 1], target)
     }
+
+    errors[N] = Loss[this.options.loss].derivative(outputs[N], y!)
 
     // From last layer, propagate backwards.
     for (let i = N; i > 0; i--) {
@@ -132,6 +133,7 @@ export class NeuralNetwork {
         .derivative(outputs[i])
         .dot(this.alpha)
         .dot(errors[i])
+        .dot(multiplier ?? 1)
 
       // Update weights.
       const delta = gradient.multiply(outputs[i - 1].transpose())
@@ -140,5 +142,30 @@ export class NeuralNetwork {
       // Calculate error for next layer.
       errors[i - 1] = this.layers[i - 1].weights.transpose().multiply(errors[i])
     }
+  }
+
+  load(weights: number[][]): void {
+    this.layers = this.layers.map((l, i) => {
+      const input = i === 0 ? this.states : this.layers[i - 1].units
+      if (weights[i].length !== input * l.units) {
+        throw new Error(
+          `Invalid weights for layer ${i}, expected ${input * l.units} units but got ${
+            weights[i].length
+          }!`
+        )
+      }
+      return {
+        ...l,
+        weights: new Tensor([l.units, input], weights[i]),
+      }
+    })
+  }
+
+  /**
+   * Exports the current network weights.
+   * @returns {number[][]} - The weights of each layer.
+   */
+  save(): number[][] {
+    return this.layers.map((l) => l.weights.data)
   }
 }

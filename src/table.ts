@@ -51,4 +51,20 @@ export class Table {
       this.table[key][action] = value
     }
   }
+
+  /**
+   * Loads a pre-existing Q-Table.
+   * @param {Record<string, number[]>} table - The table to load.
+   */
+  load(table: Record<string, number[]>): void {
+    this.table = table
+  }
+
+  /**
+   * Returns the current state of the Q-Table.
+   * @returns {Record<string, number[]>} - The table.
+   */
+  save(): Record<string, number[]> {
+    return this.table
+  }
 }

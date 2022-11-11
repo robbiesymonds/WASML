@@ -3,12 +3,13 @@ import { Memory } from "./memory"
 import { Layer, NeuralNetwork } from "./network"
 import { Tensor } from "./math"
 import { Table } from "./table"
+import { DQNAgent } from "./lib/karparthy.js"
 
 export interface BaseOptions {
   alpha: number
   gamma: number
   epsilon: number
-  epsilonDecay: boolean
+  epsilonDecay: number
 }
 
 interface ModelOptions extends BaseOptions {
@@ -29,7 +30,7 @@ const DEFAULT_MODEL_OPTIONS: ModelOptions = {
   maxMemory: 1000,
   batchSize: 100,
   episodeSize: 50,
-  epsilonDecay: false, // causes a decay to deterministic behavior over ~30,000 steps.
+  epsilonDecay: 1e6,
 }
 
 const DEFAULT_COMPILE_OPTIONS: CompileOptions = {
@@ -39,6 +40,7 @@ const DEFAULT_COMPILE_OPTIONS: CompileOptions = {
 enum Mode {
   TABLE,
   MODEL,
+  KARPARTHY,
 }
 
 export default class WASML {
@@ -54,10 +56,12 @@ export default class WASML {
   private Target!: NeuralNetwork
   private Memory!: Memory
   private QTable!: Table
+  private KARPATHY!: DQNAgent
 
   private last_state!: number[]
   private last_action!: number
   private episode: number = 0
+  private epsilon: number = 0
 
   /**
    * Loads the WASM binary into the browser.
@@ -77,16 +81,47 @@ export default class WASML {
     this.states = states
     this.actions = actions
     this.options = { ...DEFAULT_MODEL_OPTIONS, ...options }
+    this.epsilon = this.options.epsilon
 
     await WASML.load().then(() => {
       this.mode = Mode.MODEL
     })
   }
 
+  /**
+   * Uses Andrej Karpathy's method to train the model.
+   * @note For some reason, the new implementation still won't generalise to small losses, so this method is included for now.
+   * @param {number} states - The size of the input vector space for the model.
+   * @param {number} actions - The number of actions the model can take.
+   * @param {ModelOptions} options - The options for the model.
+   * @deprecated This method will be removed in a future release.
+   */
+  async karparthy(states: number, actions: number, options?: Partial<ModelOptions>): Promise<void> {
+    this.states = states
+    this.actions = actions
+    this.options = { ...DEFAULT_MODEL_OPTIONS, ...options }
+    this.epsilon = this.options.epsilon
+
+    await WASML.load().then(() => {
+      this.mode = Mode.KARPARTHY
+      this.KARPATHY = new DQNAgent(
+        { getNumStates: () => states, getMaxNumActions: () => actions },
+        this.options
+      )
+    })
+  }
+
+  /**
+   * Generates a Q-Learning table with the given options.
+   * @param {number} states - The size of the input vector space for the table.
+   * @param {number} actions - The number of actions the table can take.
+   * @param {BaseOptions} options - The options for the table.
+   */
   async table(states: number, actions: number, options?: Partial<BaseOptions>): Promise<void> {
     this.states = states
     this.actions = actions
     this.options = { ...DEFAULT_MODEL_OPTIONS, ...options }
+    this.epsilon = this.options.epsilon
     this.QTable = new Table(states, actions)
 
     await WASML.load().then(() => {
@@ -109,10 +144,11 @@ export default class WASML {
    * @param {Layer[]} layers - The array of layers to add to the neural network.
    */
   addLayers(layers: Layer[]): void {
-    if (this.mode === Mode.TABLE) throw new Error("Layers are not supported for table mode.")
-    if (this.mode !== Mode.MODEL) throw new Error("Model must be initialised before adding layers.")
-
+    if (this.mode === Mode.TABLE || Mode.KARPARTHY)
+      throw new Error("Layers are not supported for non-model modes.")
+    if (this.mode === undefined) throw new Error("Model must be initialised before adding layers.")
     if (layers.length === 0) throw new Error("No layers were provided.")
+
     this.layers = [...this.layers, ...layers]
   }
 
@@ -120,14 +156,14 @@ export default class WASML {
    * Compiles the specified model with the given options.
    * @param {Partial<CompileOptions>} options - The compilation options for the model.
    */
-  compile(options: Partial<CompileOptions>): void {
+  compile(options?: Partial<CompileOptions>): void {
     this.config = { ...DEFAULT_COMPILE_OPTIONS, ...options }
 
     if (this.mode === undefined)
       throw new Error("Model or table must be initialised before compiling.")
 
-    if (this.mode === Mode.TABLE) {
-      console.warn('A call to ".compile()" is not required for table mode.')
+    if (this.mode === Mode.TABLE || this.mode === Mode.KARPARTHY) {
+      console.warn('A call to ".compile()" is not required for non-model modes.')
       return
     }
 
@@ -170,10 +206,12 @@ export default class WASML {
       )
     }
 
+    if (this.mode === Mode.KARPARTHY) return this.KARPATHY.act(input)
+
     // Greedy epsilon policy.
     let action: number
 
-    if (Math.random() < this.options.epsilon) action = Math.floor(Math.random() * this.actions)
+    if (Math.random() < this.epsilon) action = Math.floor(Math.random() * this.actions)
     else {
       // Determine source from mode.
       if (this.mode === Mode.TABLE) action = Tensor.argmax(this.QTable.get(input))
@@ -181,7 +219,11 @@ export default class WASML {
     }
 
     // Decrease epsilon.
-    if (this.options.epsilonDecay) this.options.epsilon *= 0.9999
+    if (this.options.epsilonDecay && this.epsilon > 0) {
+      this.epsilon -= this.options.epsilon / this.options.epsilonDecay
+    }
+
+    console.log(this.DQN.forward(input))
 
     // Keep track of this information for the reward phase.
     this.last_state = input
@@ -191,12 +233,14 @@ export default class WASML {
 
   /**
    * Rewards the model for the previous action.
-   * @param {number[]} state - The next state of the model.
    * @param {number} reward - The reward value to give the model.
+   * @param {number[]} state - The next state of the model.
    */
   reward(reward: number, state: number[]): void {
     this.initialised()
     this.episode++
+
+    if (this.mode === Mode.KARPARTHY) return this.KARPATHY.learn(reward)
 
     // Table specific reward logic.
     if (this.mode === Mode.TABLE) {
@@ -215,12 +259,13 @@ export default class WASML {
       this.Memory.add(this.last_state, this.last_action, reward, state)
 
       // Sample a random batch from memory.
-      const batch = this.Memory.sample()
-      if (!batch) return
+      const samples = this.Memory.sample()
+      if (!samples) return
 
+      const batch = [...samples, this.Memory.back()]
       for (const b of batch) {
         const target = b.r + this.options.gamma * Math.max(...this.Target.forward(b.n))
-        this.DQN.backward(target, b.a)
+        this.DQN.backward(target, b.a, 1 / this.options.batchSize)
       }
 
       // Copy the weights from the DQN to the Target every episodeSize.
@@ -230,11 +275,57 @@ export default class WASML {
     }
   }
 
-  import(): void {
-    // TODO: Import the model from a file.
+  import(data: string): void {
+    try {
+      const json = JSON.parse(data)
+
+      if (!json.m && !json.w) throw new Error("Invalid data structure for WASML import!")
+
+      if (json.s !== this.states && json.a !== this.actions)
+        throw new Error("Imported data does not match specified states and actions!")
+
+      switch (json.m) {
+        case Mode.MODEL: {
+          this.DQN.load(json.w)
+          this.Target.load(json.w)
+          break
+        }
+        case Mode.TABLE: {
+          this.QTable.load(json.w)
+          break
+        }
+        case Mode.KARPARTHY: {
+          this.KARPATHY.fromJSON(json.w)
+          break
+        }
+        default:
+          throw new Error("Invalid mode supplied with data!")
+      }
+    } catch (e) {
+      throw e
+    }
   }
 
-  export(): void {
-    // TODO: Export the model to a file.
+  export(): string {
+    const data = {
+      m: this.mode,
+      s: this.states,
+      a: this.actions,
+      w: undefined as any,
+    }
+
+    switch (this.mode) {
+      case Mode.TABLE:
+        data.w = this.QTable.save()
+        break
+      case Mode.MODEL:
+        data.w = this.DQN.save()
+        break
+      case Mode.KARPARTHY:
+        data.w = this.KARPATHY.toJSON()
+        break
+    }
+
+    return JSON.stringify(data)
   }
 }

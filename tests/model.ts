@@ -8,22 +8,22 @@ const main = async () => {
 
   // 1 hidden layer with 60 neurons + 1 output layer.
   await wasml.model(5, 3, {
-    epsilon: 0.2,
-    alpha: 0.01,
+    epsilon: 0.15,
+    alpha: 0.001,
     gamma: 0.975,
-    episodeSize: 350,
-    batchSize: 250,
+    episodeSize: 50,
+    batchSize: 300,
     maxMemory: 1e6,
-    epsilonDecay: true,
+    epsilonDecay: 1e6,
   })
   wasml.addLayers([
     {
       units: 64,
-      activation: "linear",
+      activation: "sigmoid",
     },
     { units: 3, activation: "linear" },
   ])
-  wasml.compile({ loss: "meanSquaredError" })
+  wasml.compile({ loss: "meanAbsoluteError" })
 
   // Runs the game loop.
   // - The state consists of 5 values: the movement direction, and 4 values indicating whether the food is above, below, left, or right of the bot.
@@ -36,7 +36,6 @@ const main = async () => {
 
     // Get the reward.
     const reward = game.reward()
-    console.log(reward)
 
     // Render new state.
     game.render()

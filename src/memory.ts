@@ -30,6 +30,7 @@ export class Memory {
     if (this.memory.length <= this.batchSize) return null
 
     const set = new Set<number>()
+
     const { floor, random } = Math
     for (let i = 0; i < this.batchSize; i++) {
       let idx
@@ -50,6 +51,14 @@ export class Memory {
   add(state: number[], action: number, reward: number, next: number[]): void {
     if (this.memory.length + 1 === this.maxSize) this.memory.shift()
     this.memory.push({ c: state, a: action, r: reward, n: next })
+  }
+
+  /**
+   * Returns the last experience in the memory.
+   * @returns {Replay} The latest experience in the memory.
+   */
+  back(): Replay {
+    return this.memory[this.memory.length - 1]
   }
 
   /**

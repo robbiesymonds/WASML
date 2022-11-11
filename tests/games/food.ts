@@ -89,8 +89,18 @@ export default class FoodGame {
       return 100.0
     }
 
-    // Otherwise negative reward.
-    return this.dist() < this.last_dist ? 0.05 : -0.1
+    // Small reward for moving in the direction of food.
+    if (
+      ((this.food[1] < this.player[1] && this.axis === 0) ||
+        (this.food[1] > this.player[1] && this.axis === 2) ||
+        (this.food[0] < this.player[0] && this.axis === 3) ||
+        (this.food[0] > this.player[0] && this.axis === 1)) &&
+      this.dist() < this.last_dist
+    )
+      return 0.1
+
+    //  Otherwise negative.
+    return -0.5
   }
 
   render() {
