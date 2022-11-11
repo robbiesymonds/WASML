@@ -144,10 +144,11 @@ export default class WASML {
    * @param {Layer[]} layers - The array of layers to add to the neural network.
    */
   addLayers(layers: Layer[]): void {
-    if (this.mode === Mode.TABLE || Mode.KARPARTHY)
-      throw new Error("Layers are not supported for non-model modes.")
     if (this.mode === undefined) throw new Error("Model must be initialised before adding layers.")
     if (layers.length === 0) throw new Error("No layers were provided.")
+    if (this.mode === Mode.TABLE || this.mode === Mode.KARPARTHY) {
+      throw new Error("Layers are not supported for non-model modes.")
+    }
 
     this.layers = [...this.layers, ...layers]
   }
