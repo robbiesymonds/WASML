@@ -1,7 +1,7 @@
 {
   "name": "wasml",
   "version": "1.0.0",
-  "description": "WASM-powered reinforcement learning library written in Rust.",
+  "description": "WASM-powered reinforcement learning library written in Rust and TypeScript.",
   "repository": "https://github.com/robbiesymonds/WASML",
   "author": "Robbie Symonds <hello@robbiesymonds.me>",
   "types": "dist/index.d.ts",
