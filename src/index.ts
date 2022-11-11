@@ -224,8 +224,6 @@ export default class WASML {
       this.epsilon -= this.options.epsilon / this.options.epsilonDecay
     }
 
-    console.log(this.DQN.forward(input))
-
     // Keep track of this information for the reward phase.
     this.last_state = input
     this.last_action = action
