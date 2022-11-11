@@ -119,3 +119,6 @@ The following are collection of optional parameters that can be passed as option
 `batchSize`|number| 100 | The number of experiences to sample each iteration.
 `episodeSize`|number| 50 | The number of iterations before updating target network.
 `epsilonDecay`|number| 1000000 | The number of iterations over which epsilon tends to zero.
+`loss`|`Loss`|`meanSquaredError`|The loss function used in backpropagation.
+`units`|number|*N/A*|The number of units for a given hidden layer.
+`activation`|`Activation`|*N/A*|The activation used in both forward and backwards passes.
